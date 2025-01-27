@@ -56,6 +56,7 @@ DMA_HandleTypeDef hdma_spi1_tx;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+//test
 static PLAYER player1, player2;
 static BALL ball;
 static USER_INPUT uInput;
