@@ -239,13 +239,13 @@ static void drawDashedLine(uint16_t x, uint16_t y, uint16_t space){
 	}
 }
 
-static void drawScore(){
+static void drawScore(uint16_t color){
 	char score[1];
 	sprintf(score,"%lu",player1.score);
-	LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)+(LCD_HEIGHT/4), score, FONT_16X26, C_WHITE, C_BLACK);
+	LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)+(LCD_HEIGHT/4), score, FONT_16X26, color, C_BLACK);
 //	UG_PutString(LCD_WIDTH/2, (LCD_HEIGHT/2)+(LCD_HEIGHT/4), score);
 	sprintf(score,"%lu",player2.score);
-	LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), score, FONT_16X26, C_WHITE, C_BLACK);
+	LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), score, FONT_16X26, color, C_BLACK);
 //	UG_PutString(LCD_WIDTH/2, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), score);
 }
 
@@ -256,7 +256,11 @@ void gameLogic(){
 		updateDisplay();
 	}
 	else{
-		drawScore();
+		drawScore(C_WHITE);
+		if(uInput.leftAnalogKey == GPIO_PIN_RESET || uInput.rightAnalogKey == GPIO_PIN_RESET){
+			game_pause = 0;
+			drawScore(C_BLACK);
+		}
 	}
 }
 

@@ -57,8 +57,20 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LEFT_ANALOG_KEY_Pin GPIO_PIN_4
+#define LEFT_ANALOG_KEY_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
+#define LEFT_ANALOG_X_Pin GPIO_PIN_6
+#define LEFT_ANALOG_X_GPIO_Port GPIOA
+#define LEFT_ANALOG_Y_Pin GPIO_PIN_7
+#define LEFT_ANALOG_Y_GPIO_Port GPIOA
+#define RIGHT_ANALOG_X_Pin GPIO_PIN_0
+#define RIGHT_ANALOG_X_GPIO_Port GPIOB
+#define RIGHT_ANALOG_Y_Pin GPIO_PIN_1
+#define RIGHT_ANALOG_Y_GPIO_Port GPIOB
+#define RIGHT_ANALOG_KEY_Pin GPIO_PIN_2
+#define RIGHT_ANALOG_KEY_GPIO_Port GPIOB
 #define LCD_DC_Pin GPIO_PIN_6
 #define LCD_DC_GPIO_Port GPIOB
 #define LCD_RST_Pin GPIO_PIN_7

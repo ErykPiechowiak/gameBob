@@ -351,12 +351,24 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LCD_DC_Pin|LCD_RST_Pin|LCD_CS_Pin, GPIO_PIN_SET);
 
+  /*Configure GPIO pin : LEFT_ANALOG_KEY_Pin */
+  GPIO_InitStruct.Pin = LEFT_ANALOG_KEY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(LEFT_ANALOG_KEY_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RIGHT_ANALOG_KEY_Pin */
+  GPIO_InitStruct.Pin = RIGHT_ANALOG_KEY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(RIGHT_ANALOG_KEY_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LCD_DC_Pin */
   GPIO_InitStruct.Pin = LCD_DC_Pin;
@@ -531,6 +543,8 @@ static void taskGetUserInput(void *pvParameters){
 		uInput.rightYAxis = joystick[3];
 		//sprintf(buffer,"X=%lu Y=%lu",joystick[0],joystick[1]);
 		//HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), 100);
+		uInput.leftAnalogKey = HAL_GPIO_ReadPin(LEFT_ANALOG_KEY_GPIO_Port, LEFT_ANALOG_KEY_Pin);
+		uInput.rightAnalogKey = HAL_GPIO_ReadPin(RIGHT_ANALOG_KEY_GPIO_Port, RIGHT_ANALOG_KEY_Pin);
 		vTaskDelay(33);
 	}
 }

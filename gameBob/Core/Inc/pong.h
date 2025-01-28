@@ -41,7 +41,7 @@ static void updatePlayerPosition(PLAYER *player, uint16_t xaxis, uint16_t yaxis)
 static void updateBallPosition();
 static void drawPlayer(PLAYER *player);
 static void drawDashedLine(uint16_t x, uint16_t y, uint16_t space);
-static void drawScore();
+static void drawScore(uint16_t color);
 
 
 
