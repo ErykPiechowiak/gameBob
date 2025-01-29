@@ -154,15 +154,17 @@ static void updateBallPosition(){
 	else if(ball.y+ball.r > LCD_HEIGHT || ball.y - ball.r < 0){
 		if(ball.y+ball.r > LCD_HEIGHT){
 			player2.score++;
+			game_pause = 2;
 		}
 		else{
 			player1.score++;
+			game_pause = 1;
 		}
 
 		ball.x = LCD_HEIGHT/2;
 		ball.y = LCD_WIDTH/2;
 
-		game_pause = 1;
+
 
 	}
 	else if(ball.x-ball.r <= 0 || ball.x+ball.r >= LCD_WIDTH){
@@ -257,7 +259,7 @@ void gameLogic(){
 	}
 	else{
 		drawScore(C_WHITE);
-		if(uInput.leftAnalogKey == GPIO_PIN_RESET || uInput.rightAnalogKey == GPIO_PIN_RESET){
+		if((game_pause == 1 && uInput.leftAnalogKey == GPIO_PIN_RESET) || (game_pause == 2 && uInput.rightAnalogKey == GPIO_PIN_RESET)){
 			game_pause = 0;
 			drawScore(C_BLACK);
 		}
