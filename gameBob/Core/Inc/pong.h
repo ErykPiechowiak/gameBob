@@ -10,6 +10,11 @@
 
 #include "stdint.h"
 #include "user.h"
+#include "stm32f1xx_hal.h"
+#include "ugui_fonts.h"
+
+#define PWM_FREQ 64000000
+#define PWM_CHANNEL TIM_CHANNEL_1
 
 typedef struct{
 	uint16_t oldx1;
@@ -32,7 +37,7 @@ typedef struct{
 } BALL ;
 
 
-void initGame();
+void initGame(TIM_HandleTypeDef *htimer);
 void gameInput(USER_INPUT uInput);
 void gameLogic();
 static void updateDisplay();
@@ -42,6 +47,14 @@ static void updateBallPosition();
 static void drawPlayer(PLAYER *player);
 static void drawDashedLine(uint16_t x, uint16_t y, uint16_t space);
 static void drawScore(uint16_t color);
+static void buzzer(int action);
+static void winAnimation(const PLAYER player);
+
+
+/* BUZZER */
+static int presForFrequency (int frequency);
+static void playTone (int *tone, int *duration, int *pause, int size);
+static void noTone (void);
 
 
 
