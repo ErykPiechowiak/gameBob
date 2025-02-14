@@ -16,9 +16,19 @@ typedef struct{
 	uint16_t leftXAxis;
 	uint16_t leftYAxis;
 	uint8_t leftAnalogKey;
+
 	uint16_t rightXAxis;
 	uint16_t rightYAxis;
 	uint8_t rightAnalogKey;
+
+	uint8_t keyLeft;
+	uint8_t keyRight;
+	uint8_t keyUp;
+	uint8_t keyDown;
+	uint8_t keyA;
+	uint8_t keyB;
+
+	uint16_t seed; //get noise value from flaoting adc input
 
 } USER_INPUT;
 

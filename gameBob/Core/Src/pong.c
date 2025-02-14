@@ -12,37 +12,31 @@
 #include "pitches.h"
 #include "ugui_fonts.h"
 #include <inttypes.h>
+#include <string.h>
 
+/* GAME VARIABLES */
 static PLAYER player1, player2;
 static BALL ball;
 static USER_INPUT uInput;
-static uint32_t seed = 12342;
-static uint8_t game_pause = 0;
+static USER_INPUT uInputOld;
+static uint32_t seed;;
+
+
+/* MAIN MENU */
+//static uint8_t game_pause = 0; //1 -> player 1 scored; 2 -> player
+static enum GamePause game_pause = NONE;
+static enum Screen screen = MAIN_MENU_SCREEN;
+static enum ActiveMenuOption menu_option = START_GAME;
+static uint8_t game_start = 0;
+
+
+/* HANDLERS ETC */
 TIM_HandleTypeDef *htim;
 uint32_t pwm_freq;
 
-/*
-void initGame(PLAYER *player1, PLAYER *player2, BALL *ball){
-	player1->x1 = LCD_WIDTH /2 -30;
-	player1->x2 = LCD_WIDTH /2 +30;
-	player1->oldx1 = 0;
-	player1->oldx2 = 0;
-	player1->y = 1;
-	player1->acc = 0;
-
-	player2->x1 = LCD_WIDTH /2 -30;
-	player2->x2 = LCD_WIDTH /2 +30;
-	player2->y = LCD_HEIGHT;
-	player2->acc = 0;
-
-	ball->x = LCD_HEIGHT/2;
-	ball->y = LCD_WIDTH/2;
-	ball->r = 5;
 
 
-}
-*/
-void initGame(TIM_HandleTypeDef *htimer){
+void initGame(TIM_HandleTypeDef *htimer, USER_INPUT uInput){
 	player1.x1 = LCD_WIDTH /2 -30;
 	player1.x2 = LCD_WIDTH /2 +30;
 	player1.oldx1 = 0;
@@ -50,12 +44,14 @@ void initGame(TIM_HandleTypeDef *htimer){
 	player1.y = LCD_HEIGHT;
 	player1.acc = 0;
 	player1.score = 0;
+	strcpy(player1.name, "Player1");
 
 	player2.x1 = LCD_WIDTH /2 -30;
 	player2.x2 = LCD_WIDTH /2 +30;
 	player2.y = 2;
 	player2.acc = 0;
 	player2.score = 0;
+	strcpy(player2.name, "Player2");
 
 	ball.x = LCD_HEIGHT/2;
 	ball.y = LCD_WIDTH/2;
@@ -64,8 +60,8 @@ void initGame(TIM_HandleTypeDef *htimer){
 	ball.r = 5;
 	ball.accy = 10;
 	//ball.accx = 0;
-	srand(seed);
-	ball.accx = rand()%7;
+	srand(uInput.seed);
+	updateBallAngle();//rand()%7;
 
 	htim = htimer;
 
@@ -79,7 +75,43 @@ void initGame(TIM_HandleTypeDef *htimer){
 
 }
 
+static void reInitGame(){
+	player1.x1 = LCD_WIDTH /2 -30;
+	player1.x2 = LCD_WIDTH /2 +30;
+	player1.oldx1 = 0;
+	player1.oldx2 = 0;
+	player1.y = LCD_HEIGHT;
+	player1.acc = 0;
+	player1.score = 0;
+	strcpy(player1.name, "Player1");
+
+	player2.x1 = LCD_WIDTH /2 -30;
+	player2.x2 = LCD_WIDTH /2 +30;
+	player2.y = 2;
+	player2.acc = 0;
+	player2.score = 0;
+	strcpy(player2.name, "Player2");
+
+	ball.x = LCD_HEIGHT/2;
+	ball.y = LCD_WIDTH/2;
+	ball.oldx = 0;
+	ball.oldy = 0;
+	ball.r = 5;
+	ball.accy = 10;
+
+
+	updateBallAngle();
+	__HAL_TIM_SET_PRESCALER(htim, presForFrequency(500));
+
+	game_pause = NONE;
+	/* INIT DISPLAY */
+	UG_FillScreen(C_BLACK);
+	//drawDashedLine(0, LCD_HEIGHT/2, 10);
+	UG_Update();
+}
+
 void gameInput(USER_INPUT input){
+	uInputOld = uInput;
 	uInput = input;
 }
 
@@ -114,29 +146,14 @@ static void updatePlayersPosition(){
 
 	updatePlayerPosition(&player1, uInput.leftXAxis, uInput.leftYAxis);
 	updatePlayerPosition(&player2, uInput.rightXAxis, uInput.rightYAxis);
-	/*
-	if(uInput.leftXAxis < 1800 || uInput.leftXAxis > 2200){
-		player1.acc = (uInput.leftXAxis - 2000)/100;
-		if(player1.x1+player1.acc > 0 && player1.x2+player1.acc < LCD_WIDTH){
-			player1.oldx1 = player1.x1;
-			player1.oldx2 = player1.x2;
-			player1.x1+=player1.acc;
-			player1.x2+=player1.acc;
-		}
-		else{
-			if(player1.x1+player1.acc < 0){
-				player1.acc = 0 - player1.x1;
-			}
-			else{
-				player1.acc = LCD_WIDTH - player1.x2;
-			}
-			player1.oldx1 = player1.x1;
-			player1.oldx2 = player1.x2;
-			player1.x1+=player1.acc;
-			player1.x2+=player1.acc;
-		}
-	}
-	*/
+
+}
+
+static void updateBallAngle(){
+	int16_t random_value = rand()%7;
+	ball.accx = random_value;
+	random_value = rand()%2;
+	ball.accx = random_value == 0 ? ball.accx : ball.accx *-1;
 }
 
 static void updateBallPosition(){
@@ -165,11 +182,11 @@ static void updateBallPosition(){
 	else if(ball.y+ball.r > LCD_HEIGHT || ball.y - ball.r < 0){
 		if(ball.y+ball.r > LCD_HEIGHT){
 			player2.score++;
-			game_pause = 2;
+			game_pause = PLAYER2;
 		}
 		else{
 			player1.score++;
-			game_pause = 1;
+			game_pause = PLAYER1;
 		}
 
 		ball.x = LCD_HEIGHT/2;
@@ -215,25 +232,6 @@ static void updateDisplay(){
 	/* DRAW PLAYERS */
 	drawPlayer(&player1);
 	drawPlayer(&player2);
-
-
-	/* DRAW PLAYER 1 */
-	/*
-	if(player1.acc>0){
-		UG_DrawLine(player1.x1-player1.acc, player1.y-1, player1.x1-1, player1.y-1, C_BLACK);
-		UG_DrawLine(player1.x1-player1.acc, player1.y, player1.x1-1, player1.y, C_BLACK);
-	}
-	else{
-		UG_DrawLine(player1.x2+1, player1.y-1, player1.x2-player1.acc, player1.y-1, C_BLACK);
-		UG_DrawLine(player1.x2+1, player1.y, player1.x2-player1.acc, player1.y, C_BLACK);
-	}
-	UG_DrawLine(player1.x1, player1.y-1, player1.x2, player1.y-1, C_WHITE);
-	UG_DrawLine(player1.x1, player1.y, player1.x2, player1.y, C_WHITE);
-	*/
-	/* DRAW PLAYER 2 */
-
-
-
 
 	UG_Update();
 }
@@ -308,115 +306,262 @@ static void buzzer(int action){
 
 }
 
-static void winAnimation(const PLAYER player){
+static void winAnimation(PLAYER *player){
+	/* DRAW STICKMAN */
 	UG_DrawCircle(10, 10, 5, C_BLUE);
 	UG_DrawCircle(LCD_WIDTH-10, LCD_HEIGHT-10, 5, C_RED);
-	if(player.y < LCD_HEIGHT){
-		uint16_t head_x = LCD_WIDTH/2;
-		uint16_t head_y = (LCD_HEIGHT/2)/2;
-		uint16_t head_r = 5;
+	uint16_t head_x,head_y, head_r,core_length = 0;
+	uint16_t left_hand_x1,left_hand_x2,left_hand_y1,left_hand_y2,right_hand_x1,right_hand_x2,right_hand_y1,right_hand_y2 = 0;
+	uint16_t left_leg_x1, left_leg_x2, left_leg_y1,left_leg_y2, right_leg_x1,right_leg_x2,right_leg_y1,right_leg_y2 = 0;
 
-		uint16_t core_length = 20;
+	if(player->y < LCD_HEIGHT){
 
-		uint16_t left_hand_x1 = head_x - 20;
-		uint16_t left_hand_x2 = head_x;
-		uint16_t left_hand_y1 = head_y-head_r-core_length/2;
-		uint16_t left_hand_y2 = head_y-head_r-5;
+		head_x = LCD_WIDTH/2;
+		head_y = (LCD_HEIGHT/2)/2;
+		head_r = 5;
 
-		uint16_t right_hand_x1 = head_x;
-		uint16_t right_hand_x2 = head_x + 20;
-		uint16_t right_hand_y1 = head_y-head_r-5;
-		uint16_t right_hand_y2 = head_y-head_r-core_length/2;
+		core_length = 20;
 
-		uint16_t left_leg_x1 = left_hand_x1;
-		uint16_t left_leg_x2 = left_hand_x2;
-		uint16_t left_leg_y1 = left_hand_y1-core_length-10;
-		uint16_t left_leg_y2 = left_hand_y2 -core_length;
+		left_hand_x1 = head_x - 20;
+		left_hand_x2 = head_x;
+		left_hand_y1 = head_y-head_r-core_length/2;
+		left_hand_y2 = head_y-head_r-5;
 
-		uint16_t right_leg_x1 = right_hand_x1;
-		uint16_t right_leg_x2 = right_hand_x2;
-		uint16_t right_leg_y1 = right_hand_y1-core_length;
-		uint16_t right_leg_y2 = right_hand_y2 -core_length-10;
+		right_hand_x1 = head_x;
+		right_hand_x2 = head_x + 20;
+		right_hand_y1 = head_y-head_r-5;
+		right_hand_y2 = head_y-head_r-core_length/2;
 
-		UG_DrawCircle(head_x, head_y, head_r, C_WHITE); //head
-		UG_DrawLine(head_x, head_y-head_r, head_x, head_y-head_r-core_length, C_WHITE); //core
-		UG_DrawLine(left_hand_x1, left_hand_y1, left_hand_x2, left_hand_y2, C_WHITE); //left hand
-		UG_DrawLine(right_hand_x1, right_hand_y1, right_hand_x2, right_hand_y2, C_WHITE); //right hand
-		UG_DrawLine(left_leg_x1, left_leg_y1, left_leg_x2, left_leg_y2, C_WHITE); //left leg
-		UG_DrawLine(right_leg_x1, right_leg_y1, right_leg_x2, right_leg_y2, C_WHITE); //right leg
+		left_leg_x1 = left_hand_x1;
+		left_leg_x2 = left_hand_x2;
+		left_leg_y1 = left_hand_y1-core_length-10;
+		left_leg_y2 = left_hand_y2 -core_length;
 
-		int STmelody[] = {
-				  NOTE_C5, NOTE_GS4, NOTE_A4, NOTE_C5, NOTE_D5, NOTE_F5, NOTE_F5,
-				  NOTE_A5, NOTE_AS5, NOTE_A5, NOTE_FS5, NOTE_D5, NOTE_A5,
-				  NOTE_A5, NOTE_A5, NOTE_G5, NOTE_A5, NOTE_C6, NOTE_A5,
-				  NOTE_C5, NOTE_A5, NOTE_F5
-		};
-		int STnoteDurations[] = {
-				  6, 6, 6, 6, 6, 6, 2,
-				  6, 6, 6, 6, 6, 2,
-				  6, 6, 6, 6, 6, 3,
-				  6, 6, 1
-		};
-		int pres = 0;
-		int dur = 0;
-		int pauseBetweenTones = 0;
-		int size = sizeof(STmelody)/sizeof(STmelody[0]);
-		int *pause = NULL;
-
-		HAL_TIM_PWM_Start(htim, TIM_CHANNEL_1);
-
-		for(int i=0; i<size;i++){
-			if(i%1==0){
-				UG_DrawLine(left_hand_x1, left_hand_y1, left_hand_x2, left_hand_y2, C_BLACK); //left hand
-				UG_DrawLine(right_hand_x1, right_hand_y1, right_hand_x2, right_hand_y2, C_BLACK); //right hand
-			}
-			if(i%2==0){
-				left_hand_y1 +=10;
-				right_hand_y2 +=10;
-			}
-			else{
-				left_hand_y1 -=10;
-				right_hand_y2 -=10;
-			}
-			if(i%1==0){
-				UG_DrawLine(left_hand_x1, left_hand_y1, left_hand_x2, left_hand_y2, C_WHITE); //left hand
-				UG_DrawLine(right_hand_x1, right_hand_y1, right_hand_x2, right_hand_y2, C_WHITE); //right hand
-			}
-
-			/* PLAY MUSIC */
-			pres = presForFrequency(STmelody[i]*3);  // calculate prescaler
-			dur = 1000/(STnoteDurations[i]);  // calculate duration
-			if (pause != NULL) pauseBetweenTones = pause[i] - STnoteDurations[i];
-			__HAL_TIM_SET_PRESCALER(htim, pres);
-			HAL_Delay(dur);   // how long the tone will play
-			noTone();  // pause
-			HAL_Delay(pauseBetweenTones);  // no tone for this duration
-
-		}
-		/* STOP BUZZER */
-		HAL_TIM_PWM_Stop(htim, TIM_CHANNEL_1);
-		__HAL_TIM_SET_PRESCALER(htim, presForFrequency(500)); //go back to nominal freq (side screen hit sound)
-
-
-	}
-}
-
-void gameLogic(){
-	if(!game_pause){
-		updatePlayersPosition();
-		updateBallPosition();
-		updateDisplay();
+		right_leg_x1 = right_hand_x1;
+		right_leg_x2 = right_hand_x2;
+		right_leg_y1 = right_hand_y1-core_length;
+		right_leg_y2 = right_hand_y2 -core_length-10;
 	}
 	else{
-		drawScore(C_WHITE);
-		if((player1.score >= 5 || player2.score >= 5) && game_pause != 4){
-			winAnimation(player2);
-			game_pause = 4;
+		head_x = LCD_WIDTH/2;
+		head_y = LCD_HEIGHT/2 + (LCD_HEIGHT/2)/2;
+		head_r = 5;
+
+		core_length = 20;
+
+		left_hand_x1 = head_x - 20;
+		left_hand_x2 = head_x;
+		left_hand_y1 = head_y+head_r+core_length/2;
+		left_hand_y2 = head_y+head_r+5;
+
+		right_hand_x1 = head_x;
+		right_hand_x2 = head_x + 20;
+		right_hand_y1 = head_y+head_r+5;
+		right_hand_y2 = head_y+head_r+core_length/2;
+
+		left_leg_x1 = left_hand_x1;
+		left_leg_x2 = left_hand_x2;
+		left_leg_y1 = left_hand_y1+core_length+10;
+		left_leg_y2 = left_hand_y2 +core_length;
+
+		right_leg_x1 = right_hand_x1;
+		right_leg_x2 = right_hand_x2;
+		right_leg_y1 = right_hand_y1+core_length;
+		right_leg_y2 = right_hand_y2 +core_length+10;
+	}
+
+	UG_DrawCircle(head_x, head_y, head_r, C_WHITE); //head
+	if(player->y < LCD_HEIGHT){
+		UG_DrawLine(head_x, head_y-head_r, head_x, head_y-head_r-core_length-5, C_WHITE); //core
+	}
+	else{
+		UG_DrawLine(head_x, head_y+head_r, head_x, head_y+head_r+core_length+5, C_WHITE); //core
+	}
+	UG_DrawLine(left_hand_x1, left_hand_y1, left_hand_x2, left_hand_y2, C_WHITE); //left hand
+	UG_DrawLine(right_hand_x1, right_hand_y1, right_hand_x2, right_hand_y2, C_WHITE); //right hand
+	UG_DrawLine(left_leg_x1, left_leg_y1, left_leg_x2, left_leg_y2, C_WHITE); //left leg
+	UG_DrawLine(right_leg_x1, right_leg_y1, right_leg_x2, right_leg_y2, C_WHITE); //right leg
+
+	int STmelody[] = {
+			  NOTE_C5, NOTE_GS4, NOTE_A4, NOTE_C5, NOTE_D5, NOTE_F5, NOTE_F5,
+			  NOTE_A5, NOTE_AS5, NOTE_A5, NOTE_FS5, NOTE_D5, NOTE_A5,
+			  NOTE_A5, NOTE_A5, NOTE_G5, NOTE_A5, NOTE_C6, NOTE_A5,
+			  NOTE_C5, NOTE_A5, NOTE_F5
+	};
+	int STnoteDurations[] = {
+			  6, 6, 6, 6, 6, 6, 2,
+			  6, 6, 6, 6, 6, 2,
+			  6, 6, 6, 6, 6, 3,
+			  6, 6, 1
+	};
+	int pres = 0;
+	int dur = 0;
+	int pauseBetweenTones = 0;
+	int size = sizeof(STmelody)/sizeof(STmelody[0]);
+	int *pause = NULL;
+
+	HAL_TIM_PWM_Start(htim, TIM_CHANNEL_1);
+
+	for(int i=0; i<size;i++){
+		if(i%1==0){
+			UG_DrawLine(left_hand_x1, left_hand_y1, left_hand_x2, left_hand_y2, C_BLACK); //left hand
+			UG_DrawLine(right_hand_x1, right_hand_y1, right_hand_x2, right_hand_y2, C_BLACK); //right hand
 		}
-		if((game_pause == 2 && uInput.leftAnalogKey == GPIO_PIN_RESET) || (game_pause == 1 && uInput.rightAnalogKey == GPIO_PIN_RESET)){
-			game_pause = 0;
-			drawScore(C_BLACK);
+		if(i%2==0){
+			left_hand_y1 +=10;
+			right_hand_y2 +=10;
+		}
+		else{
+			left_hand_y1 -=10;
+			right_hand_y2 -=10;
+		}
+		if(i%1==0){
+			UG_DrawLine(left_hand_x1, left_hand_y1, left_hand_x2, left_hand_y2, C_WHITE); //left hand
+			UG_DrawLine(right_hand_x1, right_hand_y1, right_hand_x2, right_hand_y2, C_WHITE); //right hand
+		}
+
+		/* PLAY MUSIC */
+		pres = presForFrequency(STmelody[i]*3);  // calculate prescaler
+		dur = 1000/(STnoteDurations[i]);  // calculate duration
+		if (pause != NULL) pauseBetweenTones = pause[i] - STnoteDurations[i];
+		__HAL_TIM_SET_PRESCALER(htim, pres);
+		HAL_Delay(dur);   // how long the tone will play
+		noTone();  // pause
+		HAL_Delay(pauseBetweenTones);  // no tone for this duration
+
+	}
+	/* STOP BUZZER */
+	HAL_TIM_PWM_Stop(htim, TIM_CHANNEL_1);
+	__HAL_TIM_SET_PRESCALER(htim, presForFrequency(500)); //go back to nominal freq (side screen hit sound)
+
+	/* DISPLAY GAME OVER SCREEN */
+	char text[30];
+	sprintf(text,"%s won!",player->name);
+	LCD_PutStr((LCD_WIDTH/2)-66, LCD_HEIGHT/2, text, FONT_12X16, C_WHITE,C_BLACK);
+	sprintf(text,"Press B key to continue");
+	LCD_PutStr((LCD_WIDTH/2)-80, (LCD_HEIGHT/2)+30, text, FONT_7X12, C_WHITE,C_BLACK);
+
+
+}
+
+static void clearDisplay(){
+	UG_FillScreen(C_BLACK);
+	UG_Update();
+}
+
+static void drawMainMenu(){
+	/* Mini version of the game on top */
+	UG_DrawLine(0,((LCD_HEIGHT/2)/2)-20,0,((LCD_HEIGHT/2)/2)+20,C_WHITE);
+	UG_DrawLine(1,((LCD_HEIGHT/2)/2)-20,1,((LCD_HEIGHT/2)/2)+20,C_WHITE);
+	UG_DrawLine(LCD_WIDTH,((LCD_HEIGHT/2)/2)-40,LCD_WIDTH,((LCD_HEIGHT/2)/2),C_WHITE);
+	UG_DrawLine(LCD_WIDTH-1,((LCD_HEIGHT/2)/2)-40,LCD_WIDTH-1,((LCD_HEIGHT/2)/2),C_WHITE);
+	UG_FillCircle(LCD_WIDTH/4, LCD_HEIGHT/4, 5, C_WHITE);
+	UG_DrawLine(0,LCD_HEIGHT/2-10,LCD_WIDTH,LCD_HEIGHT/2-10,C_WHITE);
+
+
+	/* OPTIONS */
+
+	if(uInput.keyB == GPIO_PIN_RESET && uInput.keyB != uInputOld.keyB){
+		if(menu_option == START_GAME){
+			screen = GAME_SCREEN;
+			clearDisplay();
+			reInitGame();
+			return;
 		}
 	}
+
+	if(uInput.keyDown == GPIO_PIN_RESET && uInput.keyDown != uInputOld.keyDown){
+		if(menu_option < EXIT_GAME){
+			menu_option++;
+		}
+	}
+	else if(uInput.keyUp == GPIO_PIN_RESET && uInput.keyUp != uInputOld.keyUp){
+		if(menu_option > START_GAME){
+			menu_option--;
+		}
+	}
+
+	uint16_t option_colors[3] = {C_WHITE, C_WHITE, C_WHITE};
+	for(int i=0; i<3; i++){
+		menu_option == i ? option_colors[i] = C_YELLOW : C_WHITE;
+	}
+
+	char buffer[20];
+	sprintf(buffer, "START GAME");
+	LCD_PutStr(LCD_WIDTH/4, LCD_HEIGHT/2+10, buffer, FONT_12X16, option_colors[0],C_BLACK);
+	sprintf(buffer, "OPTIONS");
+	LCD_PutStr(LCD_WIDTH/4, LCD_HEIGHT/2+30, buffer, FONT_12X16, option_colors[1], C_BLACK);
+	sprintf(buffer, "EXIT GAME");
+	LCD_PutStr(LCD_WIDTH/4, LCD_HEIGHT/2+50, buffer, FONT_12X16, option_colors[2], C_BLACK);
+}
+
+
+
+void gameLogic(){
+	switch(screen){
+
+	case MAIN_MENU_SCREEN:
+		drawMainMenu();
+		break;
+	case GAME_SCREEN:
+		if (game_pause == NONE){
+			/* GAME LOGIC */
+			updatePlayersPosition();
+			updateBallPosition();
+			updateDisplay();
+		}
+		else if(game_pause == PLAYER1 || game_pause == PLAYER2){
+			drawScore(C_WHITE);
+			if((player1.score >= 5 || player2.score >= 5) && game_pause != GAME_OVER){
+				clearDisplay();
+				PLAYER *winner;
+				winner = player1.score >= 5 ? &player1 : &player2;
+				winAnimation(winner);
+				game_pause = GAME_OVER;
+			}
+			if((game_pause == PLAYER2 && uInput.leftAnalogKey == GPIO_PIN_RESET) || (game_pause == PLAYER1 && uInput.rightAnalogKey == GPIO_PIN_RESET)){
+				game_pause = NONE;
+				updateBallAngle();; //Set random x-angle before resuming game
+				drawScore(C_BLACK);
+			}
+
+		}
+		else{
+			if(uInput.keyB == GPIO_PIN_RESET){
+				clearDisplay();
+
+				screen = MAIN_MENU_SCREEN;
+			}
+		}
+		break;
+	default:
+		drawMainMenu();
+	}
+
+
+
+/*
+	if (screen == MAIN_MENU){
+		drawMainMenu();
+	}
+	else{
+		if(!game_pause){
+			updatePlayersPosition();
+			updateBallPosition();
+			updateDisplay();
+		}
+		else{
+			drawScore(C_WHITE);
+			if((player1.score >= 5 || player2.score >= 5) && game_pause != GAME_OVER){
+				winAnimation(player2);
+				game_pause = GAME_OVER;
+			}
+			if((game_pause == PLAYER2 && uInput.leftAnalogKey == GPIO_PIN_RESET) || (game_pause == PLAYER1 && uInput.rightAnalogKey == GPIO_PIN_RESET)){
+				game_pause = NONE;
+				drawScore(C_BLACK);
+			}
+		}
+	}
+	*/
 }
 
