@@ -56,6 +56,22 @@ enum ActiveMenuOption{
 	EXIT_GAME
 };
 
+enum SettingsMenuOption{
+	DIFFICULTY,
+	GAME_MODE
+};
+
+enum Difficulty{
+	EASY,
+	NORMAL,
+	HARD
+};
+
+enum GameMode{
+	VERSUS,
+	COOPERATION
+};
+
 void initGame(TIM_HandleTypeDef *htimer, USER_INPUT uInput);
 void gameInput(USER_INPUT uInput);
 void gameLogic();
@@ -72,6 +88,7 @@ static void buzzer(int action);
 static void winAnimation(PLAYER *player);
 static void clearDisplay();
 static void drawMainMenu();
+static void drawSettingsMenu();
 
 
 /* BUZZER */

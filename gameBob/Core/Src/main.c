@@ -441,11 +441,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : KEY_B_Pin */
-  GPIO_InitStruct.Pin = KEY_B_Pin;
+  /*Configure GPIO pins : KEY_B_Pin KEY_A_Pin */
+  GPIO_InitStruct.Pin = KEY_B_Pin|KEY_A_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(KEY_B_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LCD_DC_Pin */
   GPIO_InitStruct.Pin = LCD_DC_Pin;
@@ -613,6 +613,7 @@ static void taskGetUserInput(void *pvParameters){
 		uInput.keyDown = HAL_GPIO_ReadPin(KEY_DOWN_GPIO_Port, KEY_DOWN_Pin);
 		uInput.keyUp = HAL_GPIO_ReadPin(KEY_UP_GPIO_Port, KEY_UP_Pin);
 		uInput.keyB = HAL_GPIO_ReadPin(KEY_B_GPIO_Port, KEY_B_Pin);
+		uInput.keyA = HAL_GPIO_ReadPin(KEY_A_GPIO_Port, KEY_A_Pin);
 
 		/* Get seed */
 		ADC_SetActiveChannel(&hadc1, ADC_CHANNEL_10);

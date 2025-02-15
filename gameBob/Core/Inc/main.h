@@ -81,6 +81,8 @@ void Error_Handler(void);
 #define KEY_UP_GPIO_Port GPIOB
 #define KEY_B_Pin GPIO_PIN_6
 #define KEY_B_GPIO_Port GPIOC
+#define KEY_A_Pin GPIO_PIN_7
+#define KEY_A_GPIO_Port GPIOC
 #define LCD_DC_Pin GPIO_PIN_6
 #define LCD_DC_GPIO_Port GPIOB
 #define LCD_RST_Pin GPIO_PIN_7

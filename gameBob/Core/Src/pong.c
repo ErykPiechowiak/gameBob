@@ -19,7 +19,11 @@ static PLAYER player1, player2;
 static BALL ball;
 static USER_INPUT uInput;
 static USER_INPUT uInputOld;
-static uint32_t seed;;
+static uint32_t seed;
+static uint8_t first_ball;
+static int16_t ball_speed = 10;
+static int16_t ball_speed_slow = 5;
+
 
 
 /* MAIN MENU */
@@ -27,6 +31,10 @@ static uint32_t seed;;
 static enum GamePause game_pause = NONE;
 static enum Screen screen = MAIN_MENU_SCREEN;
 static enum ActiveMenuOption menu_option = START_GAME;
+static enum SettingsMenuOption settings_option = DIFFICULTY;
+static enum Difficulty difficulty = NORMAL;
+static enum GameMode game_mode = VERSUS;
+uint8_t option_changed_flag = 1;
 static uint8_t game_start = 0;
 
 
@@ -58,9 +66,10 @@ void initGame(TIM_HandleTypeDef *htimer, USER_INPUT uInput){
 	ball.oldx = 0;
 	ball.oldy = 0;
 	ball.r = 5;
-	ball.accy = 10;
+	ball.accy = ball_speed;
 	//ball.accx = 0;
 	srand(uInput.seed);
+	first_ball =1;
 	updateBallAngle();//rand()%7;
 
 	htim = htimer;
@@ -97,9 +106,26 @@ static void reInitGame(){
 	ball.oldx = 0;
 	ball.oldy = 0;
 	ball.r = 5;
-	ball.accy = 10;
+	switch(difficulty){
+	case(EASY):
+		ball_speed = 5;
+		ball.accy = 5;
+		break;
 
+	case(NORMAL):
+		ball_speed = 10;
+		ball.accy = 10;
+		break;
+	case(HARD):
+		ball_speed = 15;
+		ball.accy = 15;
+		break;
+	default:
+		ball_speed = 10;
+		ball.accy = 10;
+	}
 
+	first_ball = 1;
 	updateBallAngle();
 	__HAL_TIM_SET_PRESCALER(htim, presForFrequency(500));
 
@@ -157,6 +183,11 @@ static void updateBallAngle(){
 }
 
 static void updateBallPosition(){
+	if(first_ball)
+	{
+		ball.accy= ball.accy > 0 ? ball_speed_slow : ball_speed_slow *-1;
+	}
+
 	ball.oldx = ball.x;
 	ball.oldy = ball.y;
 	ball.y += ball.accy;
@@ -167,24 +198,30 @@ static void updateBallPosition(){
 	// Player 1 check boundaries
 	if(ball.y+ball.r >= player1.y && (ball.x+ball.r >= player1.x1 && ball.x-ball.r <= player1.x2)){
 		//ball.y = player1.y;
+		ball.accy= ball.accy > 0 ? ball_speed : ball_speed*-1;
 		ball.accy *= -1;
 		ball.y += ball.accy;
 		ball.accx = (ball.x - (player1.x2-30))/2;
+		first_ball = 0;
 		//ball.r = ball.r;
 	}
 	// Player 2 check boundaries
 	else if(ball.y-ball.r <= player2.y && (ball.x+ball.r >= player2.x1 && ball.x-ball.r <= player2.x2)){
 		//ball.y = player2.y;
+		ball.accy= ball.accy > 0 ? ball_speed : ball_speed*-1;
 		ball.accy *= -1;
 		ball.y += ball.accy;
 		ball.accx = (ball.x - (player2.x2-30))/2;
+		first_ball = 0;
 	}
 	else if(ball.y+ball.r > LCD_HEIGHT || ball.y - ball.r < 0){
 		if(ball.y+ball.r > LCD_HEIGHT){
+			first_ball = 1;
 			player2.score++;
 			game_pause = PLAYER2;
 		}
 		else{
+			first_ball = 1;
 			player1.score++;
 			game_pause = PLAYER1;
 		}
@@ -449,6 +486,8 @@ static void clearDisplay(){
 	UG_Update();
 }
 
+
+/* MAIN MENU */
 static void drawMainMenu(){
 	/* Mini version of the game on top */
 	UG_DrawLine(0,((LCD_HEIGHT/2)/2)-20,0,((LCD_HEIGHT/2)/2)+20,C_WHITE);
@@ -466,6 +505,11 @@ static void drawMainMenu(){
 			screen = GAME_SCREEN;
 			clearDisplay();
 			reInitGame();
+			return;
+		}
+		else if(menu_option == SETTINGS){
+			screen = SETTINGS_SCREEN;
+			clearDisplay();
 			return;
 		}
 	}
@@ -495,7 +539,107 @@ static void drawMainMenu(){
 	LCD_PutStr(LCD_WIDTH/4, LCD_HEIGHT/2+50, buffer, FONT_12X16, option_colors[2], C_BLACK);
 }
 
+/* SETTINGS MENU */
+static void drawSettingsMenu(){
 
+	if(uInput.keyDown == GPIO_PIN_RESET && uInput.keyDown != uInputOld.keyDown){
+		if(settings_option < GAME_MODE){
+			settings_option++;
+			option_changed_flag = 1;
+		}
+	}
+	else if(uInput.keyUp == GPIO_PIN_RESET && uInput.keyUp != uInputOld.keyUp){
+		if(settings_option > DIFFICULTY){
+			settings_option--;
+			option_changed_flag = 1;
+		}
+	}
+
+	if(uInput.keyB == GPIO_PIN_RESET && uInput.keyB != uInputOld.keyB){
+		if(settings_option == DIFFICULTY){
+			option_changed_flag = 1;
+			if(difficulty == HARD){
+				difficulty = EASY;
+			}
+			else{
+				difficulty++;
+			}
+		}
+		else if(settings_option == GAME_MODE){
+			option_changed_flag = 1;
+			if(game_mode == COOPERATION)
+				game_mode = VERSUS;
+			else
+				game_mode++;
+		}
+	}
+
+	else if(uInput.keyA == GPIO_PIN_RESET && uInput.keyA != uInputOld.keyA){
+		option_changed_flag = 1;
+		screen = MAIN_MENU_SCREEN;
+		clearDisplay();
+		return;
+	}
+
+if(option_changed_flag){
+		uint16_t option_colors[2] = {C_WHITE, C_WHITE};
+		for(int i=0; i<2; i++){
+			settings_option == i ? option_colors[i] = C_YELLOW : C_WHITE;
+		}
+
+		char buffer[30];
+		sprintf(buffer, "SETTINGS: ");
+		LCD_PutStr(LCD_WIDTH/4, 10, buffer, FONT_12X20, C_WHITE,C_BLACK);
+		sprintf(buffer, "DIFFICULTY: ");
+		LCD_PutStr(LCD_WIDTH/4, LCD_HEIGHT/4+20, buffer, FONT_12X16, option_colors[0],C_BLACK);
+		/* DRAW SELECTED DIFFICULTY */
+		uint16_t difficulty_color = C_YELLOW;
+		switch(difficulty){
+		case(EASY):
+				sprintf(buffer, "EASY");
+			difficulty_color = C_GREEN;
+			break;
+		case(NORMAL):
+				sprintf(buffer, "NORMAL");
+			difficulty_color = C_BLUE;
+			break;
+		case(HARD):
+				sprintf(buffer, "HARD");
+			difficulty_color = C_RED;
+			break;
+		default:
+			sprintf(buffer,"NOMRAL");
+			difficulty_color = C_BLUE;
+		}
+		char temp_buffer[20];
+		sprintf(temp_buffer, "SSSSSSSSSSSS");
+		LCD_PutStr(LCD_WIDTH/4+24, LCD_HEIGHT/4+50, temp_buffer, FONT_12X16, C_BLACK,C_BLACK); //ERASER
+		LCD_PutStr(LCD_WIDTH/4+24, LCD_HEIGHT/4+50, buffer, FONT_12X16, difficulty_color,C_BLACK);
+
+		sprintf(buffer, "GAME MODE: ");
+		LCD_PutStr(LCD_WIDTH/4, LCD_HEIGHT/4+80, buffer, FONT_12X16, option_colors[1], C_BLACK);
+		/* DRAW SELECTED GAME MODE */
+		uint16_t game_mode_color = C_RED;
+		switch(game_mode){
+		case(VERSUS):
+			sprintf(buffer, "VERSUS");
+			game_mode_color = C_RED;
+			break;
+		case(COOPERATION):
+			sprintf(buffer, "CO-OP");
+			game_mode_color = C_GREEN;
+			break;
+		default:
+			sprintf(buffer, "VERSUS");
+			game_mode_color = C_RED;
+		}
+		LCD_PutStr(LCD_WIDTH/4+24, LCD_HEIGHT/4+110, temp_buffer, FONT_12X16, C_BLACK,C_BLACK); //ERASER
+		LCD_PutStr(LCD_WIDTH/4+24, LCD_HEIGHT/4+110, buffer, FONT_12X16, game_mode_color, C_BLACK);
+
+		option_changed_flag = 0; //reset flag
+}
+
+}
 
 void gameLogic(){
 	switch(screen){
@@ -529,10 +673,12 @@ void gameLogic(){
 		else{
 			if(uInput.keyB == GPIO_PIN_RESET){
 				clearDisplay();
-
 				screen = MAIN_MENU_SCREEN;
 			}
 		}
+		break;
+	case SETTINGS_SCREEN:
+		drawSettingsMenu();
 		break;
 	default:
 		drawMainMenu();
