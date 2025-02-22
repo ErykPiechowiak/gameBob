@@ -1579,7 +1579,13 @@ void UG_DrawBMP( UG_S16 xp, UG_S16 yp, UG_BMP* bmp )
           #ifdef UGUI_USE_COLOR_RGB888
            UG_DrawPixel( xp+x , yp , _UG_ConvertRGB565ToRGB888(*p++) ); /* Convert RGB565 to RGB888 */
           #elif defined UGUI_USE_COLOR_RGB565
+           if(*p == 0xff)
+           {
+        	   UG_DrawPixel( xp+x , yp , C_WHITE );
+           }
+           else{
            UG_DrawPixel( xp+x , yp , *p++ );
+           }
           #endif
         }
         yp++;

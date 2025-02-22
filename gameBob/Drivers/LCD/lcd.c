@@ -887,7 +887,7 @@ void LCD_Test(void)
 #if DEMO_FLASH_KB >=64
   UG_FillScreen(0x4b10);
   clearTime();
-  UG_DrawBMP((LCD_WIDTH-fry.width)/2, (LCD_HEIGHT-fry.height)/2, &fry);
+ // UG_DrawBMP((LCD_WIDTH-fry.width)/2, (LCD_HEIGHT-fry.height)/2, &fry);
   UG_Update();
   printTime();
   UG_FontSetTransparency(0);

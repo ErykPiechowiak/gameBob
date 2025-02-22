@@ -31,6 +31,8 @@
 #include "user.h"
 #include "pong.h"
 #include "pitches.h"
+#include "images.h"
+#include "main_menu.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +49,7 @@
 /* USER CODE BEGIN PM */
 #define DEFAULT_FONT FONT_6X8
 #define TIM_FREQ 64000000
+#define MAX_OBJECTS 10 //uGUI
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,8 +67,18 @@ UART_HandleTypeDef huart2;
 static PLAYER player1, player2;
 static BALL ball;
 static USER_INPUT uInput;
+static USER_INPUT uInputOld;
 static StaticTask_t xIdleTaskTCBBuffer;
 static StackType_t xIdleStack[configMINIMAL_STACK_SIZE];
+
+
+
+//uGUI
+static UG_WINDOW window_1;
+static UG_BUTTON button_start_game, button_select_game;
+static UG_TEXTBOX textbox_1;
+static UG_OBJECT obj_buff_wnd_1[MAX_OBJECTS];
+static UG_PROGRESS pgb;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,14 +93,20 @@ static void MX_TIM1_Init(void);
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 void ADC_SetActiveChannel(ADC_HandleTypeDef *hadc, uint32_t AdcChannel);
 static void initUserInput(USER_INPUT *uInput);
+static void updateSelectedOption(enum ActiveGameBobOption selected_menu_option);
+static void drawMainMenu();
 
+//uGUI
+static void window_1_callback(UG_MESSAGE *msg);
 
 
 /* TASK FUNCTIONS */
 static void testTask( void *pvParameters );
-static void taskDisplayUpdate(void *pvParameters);
+static void taskMainMenu(void *pvParameters);
 static void taskGetUserInput(void *pvParameters);
 static void taskGameLogic(void *pvParameters);
+TaskHandle_t h_task_main_menu = NULL;
+TaskHandle_t h_task_game_logic = NULL;
 
 /* USER CODE END PFP */
 
@@ -139,9 +158,11 @@ int main(void)
 
 
   xReturned = xTaskCreate(testTask, "task", 256, NULL, 1, NULL);
-//  xReturned = xTaskCreate(taskDisplayUpdate,"taskDisplayUpdate",256,NULL,3,NULL);
+  xReturned = xTaskCreate(taskMainMenu,"taskMainMenu",256,NULL,3,&h_task_main_menu);
   xReturned = xTaskCreate(taskGetUserInput,"taskGetUserInput",256,NULL,2,NULL);
-  xReturned = xTaskCreate(taskGameLogic, "taskGameLogic", 512, NULL, 3, NULL);
+
+
+  //xReturned = xTaskCreate(taskGameLogic, "taskGameLogic", 512, NULL, 3, NULL);
   vTaskStartScheduler();
   /* USER CODE END 2 */
 
@@ -484,27 +505,14 @@ static void testTask( void *pvParameters ){
 
 	for(;;){
 		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-/*
-		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	    __HAL_TIM_SET_PRESCALER(&htim1, presForFrequency(1000));
-	    vTaskDelay(250);
-	    __HAL_TIM_SET_PRESCALER(&htim1, presForFrequency(3000));
-	    vTaskDelay(250);
-	    __HAL_TIM_SET_PRESCALER(&htim1, presForFrequency(6000));
-	    vTaskDelay(250);
-	    __HAL_TIM_SET_PRESCALER(&htim1, presForFrequency(9000));
-	    vTaskDelay(250);
-	    __HAL_TIM_SET_PRESCALER(&htim1, presForFrequency(12000));
-*/
 	    vTaskDelay(500);
-
 	}
 }
 
 
 static void taskGameLogic(void *pvParameters){
-	//initGame(&player1, &player2, &ball);
-	initGame(&htim1,uInput);
+
+	initGame(h_task_main_menu,&htim1,uInput);
 	for(;;){
 		gameInput(uInput);
 		gameLogic();
@@ -512,77 +520,54 @@ static void taskGameLogic(void *pvParameters){
 	}
 }
 
-static void taskDisplayUpdate(void *pvParameters){
-//	uint16_t x1 =0;
-//	uint16_t x2 =60;
-//	uint16_t y1 =120;
-//	uint16_t y2 =120;
-//	uint16_t acc = 0;
-	UG_FillScreen(C_BLACK);
-//	UG_DrawLine(x1, y1, x2, y2, C_WHITE);
+static void drawMainMenu(){
+	UG_FillScreen(C_WHITE);
+	UG_FillFrame(0, 0, LCD_WIDTH, 30, C_PURPLE);
+	char text_buffer[25];
+	sprintf(text_buffer, "Welcome to GameBob!");
+	LCD_PutStr(10, 10, text_buffer, FONT_12X20, C_WHITE, C_PURPLE);
+	UG_DrawBMP(LCD_WIDTH/2-42, LCD_HEIGHT/2-62, &play_game_pic);
+	UG_DrawBMP(LCD_WIDTH/2-42, LCD_HEIGHT/2, &load_game_pic);
+	UG_DrawBMP(LCD_WIDTH/2-42, LCD_HEIGHT/2+62, &power_off_pic);
 	UG_Update();
-	for(;;){
+}
 
-		if(player1.acc>0){
-			UG_DrawLine(player1.x1-player1.acc, player1.y-1, player1.x1-1, player1.y-1, C_BLACK);
-			UG_DrawLine(player1.x1-player1.acc, player1.y, player1.x1-1, player1.y, C_BLACK);
+static void taskMainMenu(void *pvParameters){
+
+	static enum ActiveGameBobOption selected_menu_option = START_GAME;
+
+	drawMainMenu();
+	updateSelectedOption(selected_menu_option);
+
+	 UG_WindowShow(&window_1);
+	 UG_Update();
+	 BaseType_t xReturned;
+	 uint8_t game_started_flag = 0;
+	 for(;;){
+
+		if(game_started_flag == 0 && selected_menu_option == PLAY_GAME && uInput.keyB == GPIO_PIN_RESET){
+			 xReturned = xTaskCreate(taskGameLogic, "taskGameLogic", 512, NULL, 3, &h_task_game_logic);
+			 vTaskSuspend(NULL);
+			 drawMainMenu();
+			 updateSelectedOption(selected_menu_option);
+		 }
+		if(uInput.keyDown == GPIO_PIN_RESET && uInput.keyDown != uInputOld.keyDown){
+			if(selected_menu_option < POWER_OFF){
+				selected_menu_option++;
+				updateSelectedOption(selected_menu_option);
+			}
 		}
-		else{
-			UG_DrawLine(player1.x2+1, player1.y-1, player1.x2-player1.acc, player1.y-1, C_BLACK);
-			UG_DrawLine(player1.x2+1, player1.y, player1.x2-player1.acc, player1.y, C_BLACK);
+		else if(uInput.keyUp == GPIO_PIN_RESET && uInput.keyUp != uInputOld.keyUp){
+			if(selected_menu_option > PLAY_GAME){
+				selected_menu_option--;
+				updateSelectedOption(selected_menu_option);
+			}
 		}
-		UG_DrawLine(player1.x1, player1.y-1, player1.x2, player1.y-1, C_WHITE);
-		UG_DrawLine(player1.x1, player1.y, player1.x2, player1.y, C_WHITE);
-		UG_Update();
-		vTaskDelay(33);
-
-
-		/*
-		if(uInput.leftXAxis > 2100 && x2 < LCD_WIDTH-10){
-			acc = (uInput.leftXAxis - 2000)/100;
-			x1+=acc;
-			x2+=acc;
-			UG_DrawLine(x1, y1-1, x2, y2-1, C_WHITE);
-			UG_DrawLine(x1, y1, x2, y2, C_WHITE);
-			UG_DrawLine(x1-acc, y1-1, x1, y2-1, C_BLACK);
-			UG_DrawLine(x1-acc, y1, x1, y2, C_BLACK);
-			UG_Update();
-			vTaskDelay(33);
-		}
-		else if(uInput.leftXAxis < 1900 && x1 > 0+10){
-			acc = (2000-uInput.leftXAxis)/100;
-			x1-=acc;
-			x2-=acc;
-			UG_DrawLine(x1, y1-1, x2, y2-1, C_WHITE);
-			UG_DrawLine(x1, y1, x2, y2, C_WHITE);
-			UG_DrawLine(x2, y1-1, x2+acc, y2-1, C_BLACK);
-			UG_DrawLine(x2, y1, x2+acc, y2, C_BLACK);
-			UG_Update();
-			vTaskDelay(33);
-
-			*/
 
 
 
-		}
-		/*
-		while(x2<240){
-			x1+=5;
-			x2+=5;
-			UG_DrawLine(x1, y1, x2, y2, C_WHITE);
-			UG_DrawLine(x1-5, y1, x1, y2, C_BLACK);
-			UG_Update();
-			vTaskDelay(33);
-		}
-		while(x1>0){
-			x1-=5;
-			x2-=5;
-			UG_DrawLine(x1, y1, x2, y2, C_WHITE);
-			UG_DrawLine(x2, y1, x2+5, y2, C_BLACK);
-			UG_Update();
-			vTaskDelay(33);
-		}
-		*/
+		 vTaskDelay(33);
+	 }
 
 
 }
@@ -600,6 +585,9 @@ static void taskGetUserInput(void *pvParameters){
 			HAL_ADC_PollForConversion(&hadc1, 10);
 			joystick[i] = HAL_ADC_GetValue(&hadc1);
 		}
+
+		uInputOld = uInput;
+
 		uInput.leftXAxis = joystick[0];
 		uInput.leftYAxis = joystick[1];
 		uInput.rightXAxis = joystick[2];
@@ -620,6 +608,9 @@ static void taskGetUserInput(void *pvParameters){
 		HAL_ADC_Start(&hadc1);
 		HAL_ADC_PollForConversion(&hadc1, 10);
 		uInput.seed = HAL_ADC_GetValue(&hadc1);
+
+
+
 		vTaskDelay(33);
 	}
 }
@@ -644,7 +635,23 @@ static void initUserInput(USER_INPUT *uInput){
 
 }
 
+static void updateSelectedOption(enum ActiveGameBobOption selected_menu_option){
+	uint16_t option_colors[3] = {C_WHITE, C_WHITE, C_WHITE};
 
+	for(int i=0; i<3; i++){
+		selected_menu_option == i ? option_colors[i] = C_PURPLE : C_WHITE;
+	}
+
+	UG_DrawFrame(LCD_WIDTH/2-42, LCD_HEIGHT/2-62, LCD_WIDTH/2-42+play_game_pic.width, LCD_HEIGHT/2-62+play_game_pic.height, option_colors[0]);
+	UG_DrawFrame(LCD_WIDTH/2-42-1, LCD_HEIGHT/2-62-1, LCD_WIDTH/2-42+play_game_pic.width+1, LCD_HEIGHT/2-62+1+play_game_pic.height, option_colors[0]);
+
+	UG_DrawFrame(LCD_WIDTH/2-42, LCD_HEIGHT/2, LCD_WIDTH/2-42+play_game_pic.width, LCD_HEIGHT/2+load_game_pic.height, option_colors[1]);
+	UG_DrawFrame(LCD_WIDTH/2-42-1, LCD_HEIGHT/2-1, LCD_WIDTH/2-42+1+play_game_pic.width, LCD_HEIGHT/2+1+load_game_pic.height, option_colors[1]);
+
+	UG_DrawFrame(LCD_WIDTH/2-42, LCD_HEIGHT/2+62, LCD_WIDTH/2-42+play_game_pic.width, LCD_HEIGHT/2+62+power_off_pic.height, option_colors[2]);
+	UG_DrawFrame(LCD_WIDTH/2-42-1, LCD_HEIGHT/2+62-1, LCD_WIDTH/2-42+1+play_game_pic.width, LCD_HEIGHT/2+62+1+power_off_pic.height, option_colors[2]);
+
+}
 
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize )
 {
@@ -655,7 +662,10 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackTy
 }
 
 
+static void window_1_callback(UG_MESSAGE *msg)
+{
 
+}
 
 /* USER CODE END 4 */
 

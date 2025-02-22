@@ -13,6 +13,8 @@
 #include "ugui_fonts.h"
 #include <inttypes.h>
 #include <string.h>
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* GAME VARIABLES */
 static PLAYER player1, player2;
@@ -23,6 +25,7 @@ static uint32_t seed;
 static uint8_t first_ball;
 static int16_t ball_speed = 10;
 static int16_t ball_speed_slow = 5;
+static uint16_t coop_score = 0;
 
 
 
@@ -41,10 +44,10 @@ static uint8_t game_start = 0;
 /* HANDLERS ETC */
 TIM_HandleTypeDef *htim;
 uint32_t pwm_freq;
+TaskHandle_t h_main_menu_task;
 
 
-
-void initGame(TIM_HandleTypeDef *htimer, USER_INPUT uInput){
+void initGame(TaskHandle_t h_parent_task, TIM_HandleTypeDef *htimer, USER_INPUT uInput){
 	player1.x1 = LCD_WIDTH /2 -30;
 	player1.x2 = LCD_WIDTH /2 +30;
 	player1.oldx1 = 0;
@@ -72,6 +75,7 @@ void initGame(TIM_HandleTypeDef *htimer, USER_INPUT uInput){
 	first_ball =1;
 	updateBallAngle();//rand()%7;
 
+	h_main_menu_task = h_parent_task;
 	htim = htimer;
 
 	//presForFrequency(10);
@@ -106,6 +110,9 @@ static void reInitGame(){
 	ball.oldx = 0;
 	ball.oldy = 0;
 	ball.r = 5;
+
+	coop_score = 0;
+
 	switch(difficulty){
 	case(EASY):
 		ball_speed = 5;
@@ -203,6 +210,16 @@ static void updateBallPosition(){
 		ball.y += ball.accy;
 		ball.accx = (ball.x - (player1.x2-30))/2;
 		first_ball = 0;
+
+		if(game_mode == COOPERATION){
+			coop_score++;
+			/* add little accx to avoid staying still and scoring */
+			if(ball.accx == 0){
+				int16_t random_value = rand()%3;
+				int16_t temp_random = rand()%2;
+				ball.accx = temp_random == 0 ? random_value : random_value*-1;
+			}
+		}
 		//ball.r = ball.r;
 	}
 	// Player 2 check boundaries
@@ -213,6 +230,16 @@ static void updateBallPosition(){
 		ball.y += ball.accy;
 		ball.accx = (ball.x - (player2.x2-30))/2;
 		first_ball = 0;
+
+		if(game_mode == COOPERATION){
+			coop_score++;
+			/* add little accx to avoid staying still */
+			if(ball.accx == 0){
+				int16_t random_value = rand()%3;
+				int16_t temp_random = rand()%2;
+				ball.accx = temp_random == 0 ? random_value : random_value*-1;
+			}
+		}
 	}
 	else if(ball.y+ball.r > LCD_HEIGHT || ball.y - ball.r < 0){
 		if(ball.y+ball.r > LCD_HEIGHT){
@@ -224,6 +251,9 @@ static void updateBallPosition(){
 			first_ball = 1;
 			player1.score++;
 			game_pause = PLAYER1;
+		}
+		if(game_mode == COOPERATION){
+			game_pause = GAME_OVER;
 		}
 
 		ball.x = LCD_HEIGHT/2;
@@ -291,12 +321,22 @@ static void drawDashedLine(uint16_t x, uint16_t y, uint16_t space){
 
 static void drawScore(uint16_t color){
 	char score[2];
-	sprintf(score,"%" PRIu16,player1.score);
-	LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)+(LCD_HEIGHT/4), score, FONT_16X26, color, C_BLACK);
-//	UG_PutString(LCD_WIDTH/2, (LCD_HEIGHT/2)+(LCD_HEIGHT/4), score);
-	sprintf(score,"%" PRIu16,player2.score);
-	LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), score, FONT_16X26, color, C_BLACK);
-//	UG_PutString(LCD_WIDTH/2, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), score);
+	if(game_mode == VERSUS){
+		sprintf(score,"%" PRIu16,player1.score);
+		LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)+(LCD_HEIGHT/4), score, FONT_16X26, color, C_BLACK);
+		sprintf(score,"%" PRIu16,player2.score);
+		LCD_PutStr(LCD_WIDTH/2, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), score, FONT_16X26, color, C_BLACK);
+	}
+	else{
+		char text[30];
+		sprintf(text,"GAME OVER!");
+		LCD_PutStr(LCD_WIDTH/4, (LCD_HEIGHT/2)-(LCD_HEIGHT/4), text, FONT_16X26, C_RED, C_BLACK);
+		sprintf(text,"SCORE: %" PRIu16,coop_score);
+		LCD_PutStr(LCD_WIDTH/4, (LCD_HEIGHT/2)-13, text, FONT_16X26, C_GREEN, C_BLACK);
+		sprintf(text,"Press B key to continue");
+		LCD_PutStr((LCD_WIDTH/2)-80, (LCD_HEIGHT/2)+30, text, FONT_7X12, C_WHITE,C_BLACK);
+	}
+
 }
 
 
@@ -512,6 +552,11 @@ static void drawMainMenu(){
 			clearDisplay();
 			return;
 		}
+		else if(menu_option == EXIT_GAME){
+			clearDisplay();
+			vTaskResume(h_main_menu_task);
+			vTaskDelete(NULL);
+		}
 	}
 
 	if(uInput.keyDown == GPIO_PIN_RESET && uInput.keyDown != uInputOld.keyDown){
@@ -671,6 +716,9 @@ void gameLogic(){
 
 		}
 		else{
+			if(game_mode == COOPERATION){
+				drawScore(C_WHITE);
+			}
 			if(uInput.keyB == GPIO_PIN_RESET){
 				clearDisplay();
 				screen = MAIN_MENU_SCREEN;
@@ -684,30 +732,5 @@ void gameLogic(){
 		drawMainMenu();
 	}
 
-
-
-/*
-	if (screen == MAIN_MENU){
-		drawMainMenu();
-	}
-	else{
-		if(!game_pause){
-			updatePlayersPosition();
-			updateBallPosition();
-			updateDisplay();
-		}
-		else{
-			drawScore(C_WHITE);
-			if((player1.score >= 5 || player2.score >= 5) && game_pause != GAME_OVER){
-				winAnimation(player2);
-				game_pause = GAME_OVER;
-			}
-			if((game_pause == PLAYER2 && uInput.leftAnalogKey == GPIO_PIN_RESET) || (game_pause == PLAYER1 && uInput.rightAnalogKey == GPIO_PIN_RESET)){
-				game_pause = NONE;
-				drawScore(C_BLACK);
-			}
-		}
-	}
-	*/
 }
 

@@ -152,9 +152,12 @@
 #define C_WHITE_63                   0x9D13 // 63% White
 #define C_WHITE_89                   0xE71C // 89% White
 #define C_WHITE_94                   0xEF7D // 94% White
+#define C_ORANGE_CUSTOM				 0xE4EB
+#define C_PURPLE_CUSTOM				 0x7336
 
 #elif defined(UGUI_USE_COLOR_RGB888)
 
+#define C_PURPLE_CUSTOM				 0x573CFA
 #define C_MAROON                     0x800000
 #define C_DARK_RED                   0x8B0000
 #define C_BROWN                      0xA52A2A

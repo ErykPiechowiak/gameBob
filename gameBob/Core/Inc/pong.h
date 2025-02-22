@@ -12,6 +12,8 @@
 #include "user.h"
 #include "stm32f1xx_hal.h"
 #include "ugui_fonts.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 #define PWM_FREQ 64000000
 #define PWM_CHANNEL TIM_CHANNEL_1
@@ -72,7 +74,7 @@ enum GameMode{
 	COOPERATION
 };
 
-void initGame(TIM_HandleTypeDef *htimer, USER_INPUT uInput);
+void initGame(TaskHandle_t h_parent_task,TIM_HandleTypeDef *htimer, USER_INPUT uInput);
 void gameInput(USER_INPUT uInput);
 void gameLogic();
 static void reInitGame();
