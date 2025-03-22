@@ -33,6 +33,7 @@
 #include "pitches.h"
 #include "images.h"
 #include "main_menu.h"
+#include "esp8266.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,6 +62,7 @@ DMA_HandleTypeDef hdma_spi1_tx;
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 //test
@@ -71,14 +73,16 @@ static USER_INPUT uInputOld;
 static StaticTask_t xIdleTaskTCBBuffer;
 static StackType_t xIdleStack[configMINIMAL_STACK_SIZE];
 
+/* UART BUFFER */
 
+//uint8_t rx[50] = {0};
+//volatile uint8_t found_flag = 0;
+//uint8_t rx_index = 0;
+//volatile uint8_t tx_completed_flag = 0;
 
 //uGUI
 static UG_WINDOW window_1;
-static UG_BUTTON button_start_game, button_select_game;
-static UG_TEXTBOX textbox_1;
-static UG_OBJECT obj_buff_wnd_1[MAX_OBJECTS];
-static UG_PROGRESS pgb;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -89,12 +93,14 @@ static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 void ADC_SetActiveChannel(ADC_HandleTypeDef *hadc, uint32_t AdcChannel);
 static void initUserInput(USER_INPUT *uInput);
 static void updateSelectedOption(enum ActiveGameBobOption selected_menu_option);
 static void drawMainMenu();
+
 
 //uGUI
 static void window_1_callback(UG_MESSAGE *msg);
@@ -152,9 +158,30 @@ int main(void)
   MX_ADC1_Init();
   MX_USART2_UART_Init();
   MX_TIM1_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   LCD_init();
   initUserInput(&uInput);
+
+  size_t output_size = 50;
+  char output[output_size];
+  char ssid[30];
+  char psw[30];
+  char server[] = "172.20.10.4";
+  char port[] = "5000";
+  char cmd[60];
+  sprintf(cmd, "GET /gameBob.bin HTTP/1.1\r\nHost: @s\r\n\r\n",server);
+  sprintf(ssid, "iPhone (Eryk)");
+  sprintf(psw,"ebeebeebe");
+  uint8_t result = Esp8266_Init(&huart3);
+  result = Esp8266_SetCwMode(1);
+  //result = Esp8266_ChangeBaudRate(9600, 8, 1, 0, 0);
+//  result = Esp8266_ListAP(output);
+  result = Esp8266_ConnectAP(ssid, psw);
+  //result = Esp8266_GetIpAddress(output, output_size);
+  result = Esp8266_StartTCPIPConnection(server, port);
+  result = Esp8266_SendIpCommand(cmd);
+
 
 
   xReturned = xTaskCreate(testTask, "task", 256, NULL, 1, NULL);
@@ -402,6 +429,39 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 9600;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
 
 }
 
@@ -665,6 +725,48 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackTy
 static void window_1_callback(UG_MESSAGE *msg)
 {
 
+}
+/*
+static uint8_t initEsp8266(UART_HandleTypeDef *huart){
+	char buffer[20];
+	sprintf(buffer, "AT\r\n");
+	HAL_UART_Transmit_IT(&huart3, (uint8_t*)buffer, strlen(buffer));
+	//HAL_Delay(1000);
+	while(!tx_completed_flag){
+	}
+	HAL_UART_Receive_IT(&huart3, (uint8_t*)rx, 1);
+	while(!found_flag){
+	}
+	return found_flag;
+}
+*/
+
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	ESP8266_UART_TxCpltCallback(huart);
+	/*
+	tx_completed_flag = 1;
+	*/
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	ESP8266_UART_RxCpltCallback(huart);
+	/*
+	const char *word = "OK";
+	const char *word2 = "ERROR";
+	if(strstr((char*)rx,word)){
+		found_flag = 1;
+	}
+	else if(strstr((char*)rx,word2)){
+		found_flag = 2;
+	}
+	else{
+		rx_index++;
+		HAL_UART_Receive_IT(&huart3, rx+rx_index, 1);
+	}
+	*/
 }
 
 /* USER CODE END 4 */
